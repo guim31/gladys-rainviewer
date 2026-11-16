@@ -1,0 +1,24 @@
+{
+  "place": {
+    "latitude": 44.84,
+    "longitude": -0.58
+  },
+  "expected": {
+    "covered": true,
+    "dbz": 28,
+    "raining": true,
+    "rate": 2.1,
+    "distanceKm": 0
+  },
+  "files": {
+    "https://api.rainviewer.com/public/weather-maps.json": "weather-maps.json",
+    "https://tilecache.rainviewer.com/v2/radar/df09895a0674/256/7/63/46/2/0_0.png": "radar-7_63_46_2_0_0.png",
+    "https://tilecache.rainviewer.com/v2/radar/df09895a0674/256/7/63/45/2/0_0.png": "radar-7_63_45_2_0_0.png",
+    "https://tilecache.rainviewer.com/v2/coverage/0/256/7/64/46/0/0_0.png": "coverage-7_64_46_0_0_0.png",
+    "https://tilecache.rainviewer.com/v2/coverage/0/256/7/63/46/0/0_0.png": "coverage-7_63_46_0_0_0.png",
+    "https://tilecache.rainviewer.com/v2/radar/df09895a0674/256/7/64/46/2/0_0.png": "radar-7_64_46_2_0_0.png",
+    "https://tilecache.rainviewer.com/v2/coverage/0/256/7/63/45/0/0_0.png": "coverage-7_63_45_0_0_0.png",
+    "https://tilecache.rainviewer.com/v2/radar/df09895a0674/256/7/64/45/2/0_0.png": "radar-7_64_45_2_0_0.png",
+    "https://tilecache.rainviewer.com/v2/coverage/0/256/7/64/45/0/0_0.png": "coverage-7_64_45_0_0_0.png"
+  }
+}

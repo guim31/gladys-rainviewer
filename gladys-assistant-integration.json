@@ -1,177 +1,445 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "RainViewer",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Rain radar from RainViewer: radar image, rain now and nearest rain around your house.",
+    "fr": "Radar de pluie RainViewer : image radar, pluie en cours et pluie la plus proche de chez vous.",
+    "de": "RainViewer-Regenradar: Radarbild, aktueller Regen und nächster Regen rund um dein Zuhause.",
+    "es": "Radar de lluvia RainViewer: imagen de radar, lluvia actual y lluvia más cercana a su casa."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-rainviewer:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-rainviewer/main/cover.png",
+  "categories": ["environment"],
+  "transports": ["cloud"],
+  "location": true,
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Getting started",
+        "fr": "Pour commencer",
+        "de": "Erste Schritte",
+        "es": "Para empezar"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "One device per place: your houses located in Gladys, and the other places below. Add them in the Discovery tab. Radar data by RainViewer, free, no account.",
+        "fr": "Un appareil par lieu : vos maisons situées dans Gladys, et les autres lieux ci-dessous. Ajoutez-les dans l’onglet Découverte. Données radar RainViewer, gratuites, sans compte.",
+        "de": "Ein Gerät pro Ort: deine in Gladys verorteten Häuser und die weiteren Orte unten. Füge sie im Tab Entdecken hinzu. Radardaten von RainViewer, kostenlos, ohne Konto.",
+        "es": "Un dispositivo por lugar: sus casas ubicadas en Gladys y los demás lugares de abajo. Añádalos en la pestaña Descubrimiento. Datos de radar de RainViewer, gratuitos, sin cuenta."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://www.rainviewer.com/api.html",
+          "label": {
+            "en": "RainViewer API",
+            "fr": "API RainViewer",
+            "de": "RainViewer-API",
+            "es": "API de RainViewer"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "language",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Language of the feature names",
+        "fr": "Langue des noms de fonctionnalités",
+        "de": "Sprache der Funktionsnamen",
+        "es": "Idioma de los nombres de funciones"
+      },
+      "description": {
+        "en": "Used when a device is added, and for the radar time.",
+        "fr": "Utilisée à l’ajout d’un appareil, et pour l’heure du radar.",
+        "de": "Wird beim Hinzufügen eines Geräts und für die Radarzeit verwendet.",
+        "es": "Se usa al añadir un dispositivo y para la hora del radar."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "fr",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "zoom",
+      "type": "select",
+      "label": {
+        "en": "Radar image extent",
+        "fr": "Étendue de l’image radar",
+        "de": "Ausschnitt des Radarbilds",
+        "es": "Extensión de la imagen de radar"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Area shown around each place. The rain values are always read at the finest scale.",
+        "fr": "Zone montrée autour de chaque lieu. Les valeurs de pluie sont toujours lues à l’échelle la plus fine.",
+        "de": "Gezeigter Bereich um jeden Ort. Die Regenwerte werden immer im feinsten Maßstab gelesen.",
+        "es": "Zona mostrada alrededor de cada lugar. Los valores de lluvia se leen siempre a la escala más fina."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "7",
+      "options": [
+        {
+          "value": "7",
+          "label": {
+            "en": "Region (about 500 km)",
+            "fr": "Région (environ 500 km)",
+            "de": "Region (etwa 500 km)",
+            "es": "Región (unos 500 km)"
+          }
+        },
+        {
+          "value": "6",
+          "label": {
+            "en": "Country (about 1,000 km)",
+            "fr": "Pays (environ 1 000 km)",
+            "de": "Land (etwa 1.000 km)",
+            "es": "País (unos 1.000 km)"
+          }
+        },
+        {
+          "value": "5",
+          "label": {
+            "en": "Continent (about 2,000 km)",
+            "fr": "Continent (environ 2 000 km)",
+            "de": "Kontinent (etwa 2.000 km)",
+            "es": "Continente (unos 2.000 km)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "approach_km",
+      "type": "number",
+      "label": {
+        "en": "“Rain approaching” distance (km)",
+        "fr": "Distance « Pluie en approche » (km)",
+        "de": "Entfernung „Regen im Anmarsch“ (km)",
+        "es": "Distancia «Lluvia acercándose» (km)"
+      },
+      "description": {
+        "en": "The scene trigger fires when rain comes this close to a dry place.",
+        "fr": "Le déclencheur de scène part quand la pluie arrive à cette distance d’un lieu au sec.",
+        "de": "Der Szenenauslöser startet, wenn Regen einem trockenen Ort so nahe kommt.",
+        "es": "El disparador de escena se activa cuando la lluvia llega a esta distancia de un lugar seco."
+      },
+      "required": false,
+      "default": 15,
+      "min": 2,
+      "max": 50
+    },
+    {
+      "key": "extra_places",
+      "type": "string",
+      "label": {
+        "en": "Other places",
+        "fr": "Autres lieux",
+        "de": "Weitere Orte",
+        "es": "Otros lugares"
+      },
+      "description": {
+        "en": "Optional. Name: latitude, longitude, separated by semicolons. Renaming a place creates a new device. Eight places at most, houses included.",
+        "fr": "Facultatif. Nom : latitude, longitude, séparés par des points-virgules. Renommer un lieu crée un nouvel appareil. Huit lieux au plus, maisons comprises.",
+        "de": "Optional. Name: Breitengrad, Längengrad, durch Semikolons getrennt. Ein umbenannter Ort wird ein neues Gerät. Höchstens acht Orte, Häuser inbegriffen.",
+        "es": "Opcional. Nombre: latitud, longitud, separados por punto y coma. Renombrar un lugar crea un dispositivo nuevo. Ocho lugares como máximo, casas incluidas."
+      },
+      "placeholder": {
+        "en": "Office: 48.8566, 2.3522; Chalet: 45.92, 6.87",
+        "fr": "Bureau : 48.8566, 2.3522 ; Chalet : 45.92, 6.87",
+        "de": "Büro: 48.8566, 2.3522; Hütte: 45.92, 6.87",
+        "es": "Oficina: 48.8566, 2.3522; Chalé: 45.92, 6.87"
+      },
+      "required": false
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "check",
+      "label": {
+        "en": "Check the radar",
+        "fr": "Vérifier le radar",
+        "de": "Radar prüfen",
+        "es": "Comprobar el radar"
+      },
+      "description": {
+        "en": "Reads the newest radar image now and says, for each place, whether it rains.",
+        "fr": "Lit la dernière image radar maintenant et dit, pour chaque lieu, s’il pleut.",
+        "de": "Liest jetzt das neueste Radarbild und sagt für jeden Ort, ob es regnet.",
+        "es": "Lee ahora la última imagen de radar y dice, para cada lugar, si llueve."
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "rain_approaching",
+      "label": {
+        "en": "RainViewer: rain approaching",
+        "fr": "RainViewer : pluie en approche",
+        "de": "RainViewer: Regen im Anmarsch",
+        "es": "RainViewer: lluvia acercándose"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "Rain on the radar comes within the configured distance of a place where it does not rain yet.",
+        "fr": "La pluie du radar arrive à la distance configurée d’un lieu où il ne pleut pas encore.",
+        "de": "Regen auf dem Radar kommt einem Ort, an dem es noch nicht regnet, bis auf die eingestellte Entfernung nahe.",
+        "es": "La lluvia del radar llega a la distancia configurada de un lugar donde aún no llueve."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "place",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          },
+          "required": false,
+          "description": {
+            "en": "Leave empty for every place.",
+            "fr": "Laisser vide pour tous les lieux.",
+            "de": "Leer lassen für alle Orte.",
+            "es": "Déjelo vacío para todos los lugares."
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "place_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          }
+        },
+        {
+          "key": "distance_km",
+          "type": "number",
+          "label": {
+            "en": "Distance (km)",
+            "fr": "Distance (km)",
+            "de": "Entfernung (km)",
+            "es": "Distancia (km)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "rain_stopped",
+      "label": {
+        "en": "RainViewer: rain stopped",
+        "fr": "RainViewer : fin de la pluie",
+        "de": "RainViewer: Regen vorbei",
+        "es": "RainViewer: la lluvia ha parado"
+      },
+      "description": {
+        "en": "The radar has shown no more rain over a place for 20 minutes, after a rain episode.",
+        "fr": "Le radar ne montre plus de pluie sur un lieu depuis 20 minutes, après un épisode pluvieux.",
+        "de": "Das Radar zeigt nach einem Regenschauer seit 20 Minuten keinen Regen mehr über einem Ort.",
+        "es": "El radar no muestra lluvia sobre un lugar desde hace 20 minutos, tras un episodio de lluvia."
+      },
+      "fields": [
+        {
+          "key": "place",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          },
+          "required": false,
+          "description": {
+            "en": "Leave empty for every place.",
+            "fr": "Laisser vide pour tous les lieux.",
+            "de": "Leer lassen für alle Orte.",
+            "es": "Déjelo vacío para todos los lugares."
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "place_name",
+          "type": "string",
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          }
+        },
+        {
+          "key": "duration_minutes",
+          "type": "number",
+          "label": {
+            "en": "Rain duration (min)",
+            "fr": "Durée de la pluie (min)",
+            "de": "Regendauer (min)",
+            "es": "Duración de la lluvia (min)"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "get_rain",
+      "label": {
+        "en": "RainViewer: read the rain",
+        "fr": "RainViewer : lire la pluie",
+        "de": "RainViewer: Regen abfragen",
+        "es": "RainViewer: leer la lluvia"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Reads the newest radar image for a place: rain now, its rate, the nearest rain and the radar time.",
+        "fr": "Lit la dernière image radar d’un lieu : pluie en cours, intensité, pluie la plus proche et heure du radar.",
+        "de": "Liest das neueste Radarbild eines Ortes: aktueller Regen, Intensität, nächster Regen und Radarzeit.",
+        "es": "Lee la última imagen de radar de un lugar: lluvia actual, intensidad, lluvia más cercana y hora del radar."
+      },
+      "timeout_seconds": 30,
       "fields": [
         {
-          "key": "device",
+          "key": "place",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          },
           "required": true
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
+          "key": "raining",
           "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "label": {
+            "en": "Raining",
+            "fr": "Il pleut",
+            "de": "Es regnet",
+            "es": "Llueve"
+          }
+        },
+        {
+          "key": "rate",
+          "type": "number",
+          "label": {
+            "en": "Rain rate (mm/h)",
+            "fr": "Intensité (mm/h)",
+            "de": "Intensität (mm/h)",
+            "es": "Intensidad (mm/h)"
+          }
+        },
+        {
+          "key": "distance_km",
+          "type": "number",
+          "label": {
+            "en": "Nearest rain (km)",
+            "fr": "Pluie la plus proche (km)",
+            "de": "Nächster Regen (km)",
+            "es": "Lluvia más cercana (km)"
+          }
+        },
+        {
+          "key": "radar_time",
+          "type": "string",
+          "label": {
+            "en": "Radar time",
+            "fr": "Heure du radar",
+            "de": "Radarzeit",
+            "es": "Hora del radar"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "rain_radar",
+      "label": {
+        "en": "Rain radar",
+        "fr": "Radar de pluie",
+        "de": "Regenradar",
+        "es": "Radar de lluvia"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "The radar image of a place, the rain there and the nearest rain.",
+        "fr": "L’image radar d’un lieu, la pluie qui y tombe et la pluie la plus proche.",
+        "de": "Das Radarbild eines Ortes, der Regen dort und der nächste Regen.",
+        "es": "La imagen de radar de un lugar, la lluvia allí y la lluvia más cercana."
+      },
+      "icon": "cloud-rain",
+      "settings": [
+        {
+          "key": "place",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Place",
+            "fr": "Lieu",
+            "de": "Ort",
+            "es": "Lugar"
+          },
+          "required": true
+        },
+        {
+          "key": "show_image",
+          "type": "boolean",
+          "label": {
+            "en": "Show the radar image",
+            "fr": "Afficher l’image radar",
+            "de": "Radarbild anzeigen",
+            "es": "Mostrar la imagen de radar"
+          },
+          "default": true,
+          "required": false
+        }
+      ]
     }
   ]
 }

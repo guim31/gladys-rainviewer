@@ -9,15 +9,16 @@ A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
 no build step) that runs in its own sandboxed Docker container and talks to
 Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
-its only runtime dependency. It started from the official JavaScript template.
+with two pure-JS runtime dependencies, `pngjs` (tile decoding) and `jpeg-js`
+(the camera image). It started from the official JavaScript template.
 
 ## Commands
 
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/app.test.js              # one file
+node --test --test-name-pattern "widget"  # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
@@ -31,17 +32,24 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
-src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
-.github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
+index.js                          SDK wiring only (createApp, shutdown)
+src/app.js                        the cycle (every 5 min: newest frame, places, states, images,
+                                  triggers), discovery, actions, outage status
+src/sources.js                    RainViewer (frame list, radar and coverage tiles) and
+                                  OpenStreetMap tiles, with their caches (/data/basemap)
+src/radar.js                      analyzePlace (rain over a place, nearest rain) and renderPlace
+                                  (the camera JPEG, ≤ 150 KB)
+src/palette.js                    Universal Blue colors → dBZ → mm/h (Marshall-Palmer)
+src/geo.js                        Web Mercator tile arithmetic
+src/font.js                       5×7 bitmap font for the time and the credits on the image
+src/devices.js                    one device per place: features, names, states
+src/config.js                     DEFAULT_CONFIG (mirrors the manifest) + "Other places" parser
+src/scenes.js, src/widgets.js     scene action `get_rain`, widget `rain_radar`
+src/texts.js                      texts in en/fr/de/es, ActionFailure
+gladys-assistant-integration.json manifest
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys
+test/                             node --test, SDK fake Gladys + simulated RainViewer
+                                  (test/helpers/world.js), real recorded tiles (test/fixtures/rainviewer)
 ```
 
 ## Rules
@@ -78,8 +86,8 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** is in English, French, German and Spanish: action
+  messages, manifest texts, and `docs/{en,fr,de,es}.md`, kept in sync.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -259,3 +267,28 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## RainViewer (propre à cette intégration)
+
+- **API publique en 2026** (`https://api.rainviewer.com/public/weather-maps.json`, sans clé) : seulement les
+  deux dernières heures (`radar.past`, une image toutes les 10 min), **`nowcast` toujours vide**, zoom 7 au
+  plus (une tuile de zoom 8 est un bouche-trou de 1,4 Ko), **un seul jeu de couleurs, Universal Blue (2)** :
+  les autres identifiants renvoient le même. Usage personnel et éducatif, mention « RainViewer » obligatoire
+  (écrite sur l'image et dans le widget). Pas de limite chiffrée : « cachez beaucoup ».
+- **Lecture de la pluie** : tuiles `…/256/7/x/y/2/0_0.png` (non lissées, sans couleurs de neige) : chaque
+  pixel est exactement une couleur de la table officielle
+  (`https://www.rainviewer.com/files/rainviewer_api_colors_table.csv`, colonne Universal Blue, lignes pluie),
+  vérifié sur des tuiles réelles (`test/radar.test.js`). Pluie si ≥ 15 dBZ (en dessous, voile gris :
+  bruine ou échos de sol), intensité par Marshall-Palmer (Z = 200 R^1,6).
+- **Masque de couverture** `https://tilecache.rainviewer.com/v2/coverage/0/256/z/x/y/0/0_0.png` : **opaque
+  (noir) là où aucun radar ne voit**, transparent là où c'est couvert.
+- **Carte** : tuiles OpenStreetMap standard, avec User-Agent identifiant l'intégration et cache de 30 jours
+  dans `/data/basemap` (la politique OSM demande 7 jours au moins). Sans carte, l'image est dessinée sur gris.
+- **Image caméra** : le SDK exige `image/jpg;base64,…` de 150 Ko au plus (chaîne entière) : JPEG par
+  `jpeg-js` (pur JS), qualité abaissée si besoin ; 640 × 360 (le cadre 16:9 du widget). Les mêmes octets
+  servent l'image du widget (clé `radar-<hash du lieu>-<heure de l'image>`, qui change à chaque image).
+- **Mémoire** : `jpeg-js` alloue beaucoup d'objets éphémères ; sans réglage, le tas monte à 250 Mo
+  et plus. Le `Dockerfile` lance Node avec `--max-semi-space-size=2 --max-old-space-size=96`.
+- Pas de prévision possible avec l'API publique : le déclencheur « pluie en approche » repose sur la
+  **distance de la pluie la plus proche** (rayon 50 km), franchie entre deux images ; jamais au démarrage.
+- `transports: ["cloud"]` : le service est sur Internet (comme Open-Meteo, DWD, Pirate Weather).
