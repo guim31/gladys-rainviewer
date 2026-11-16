@@ -26,6 +26,8 @@ export const HEARTBEAT_MS = 6 * 3600_000;
 export const OUTAGE_MS = 30 * 60_000;
 // A reading older than this is not the weather of now (frames lag ~10 min).
 export const STALE_MS = 45 * 60_000;
+// A scene or a widget does not retry RainViewer sooner than this after a failure.
+const RETRY_GRACE_MS = 60_000;
 // Dry radar frames (10 minutes each) after which the rain has stopped.
 export const DRY_FRAMES_TO_STOP = 2;
 export const TRIGGERS = { APPROACHING: 'rain_approaching', STOPPED: 'rain_stopped' };
@@ -56,6 +58,7 @@ export function createApp(gladys, options = {}) {
   let invalidPlaces = [];
   let frame = null;
   let lastSuccess = null;
+  let lastFailureAt = null;
   const startedAt = now();
   const failingPlaces = new Set();
   let failing = false;
@@ -127,6 +130,7 @@ export function createApp(gladys, options = {}) {
       }
       return frame;
     } catch (err) {
+      lastFailureAt = now();
       if (!failing) {
         failing = true;
         logger.warn(`RainViewer unreachable: ${err.message}`);
@@ -169,7 +173,8 @@ export function createApp(gladys, options = {}) {
       return events;
     }
     const base = { place: deviceIds(gladys, place).device, place_name: place.name };
-    if (near && entry.near === false) {
+    // Not inside a rain episode: a weak frame between two showers is no approach.
+    if (near && entry.near === false && entry.rainSince === null) {
       // Rain crossing the distance, or a shower that started within one frame.
       events.push([
         TRIGGERS.APPROACHING,
@@ -319,7 +324,9 @@ export function createApp(gladys, options = {}) {
     }
     const fresh = (item) => item?.reading && now() - item.frameTime < STALE_MS;
     let entry = watched.get(placeId(place));
-    if (!fresh(entry)) {
+    // RainViewer failed less than a minute ago: answer at once, no new try.
+    const justFailed = failing && lastFailureAt !== null && now() - lastFailureAt < RETRY_GRACE_MS;
+    if (!fresh(entry) && !justFailed) {
       try {
         await refreshAfter();
         entry = watched.get(placeId(place));
@@ -428,7 +435,12 @@ export function createApp(gladys, options = {}) {
     if (config.approach_km !== previous.approach_km) {
       // A new distance is no rain approaching: re-read the state quietly.
       for (const entry of watched.values()) {
-        entry.near = undefined;
+        const reading = entry.reading;
+        if (reading?.covered) {
+          entry.near =
+            reading.raining ||
+            (reading.distanceKm !== null && reading.distanceKm <= config.approach_km);
+        }
       }
     }
     await loadPlaces();

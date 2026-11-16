@@ -346,3 +346,13 @@ test('RainViewer down for an hour: the scene action fails instead of an old read
   assert.equal(answer.success, false);
   assert.match(answer.error.en, /RainViewer does not answer/);
 });
+
+test('a weak frame inside a rain episode is no "rain approaching" when the rain comes back', async () => {
+  const world = await createWorld();
+  await createAll(world);
+  await nextFrame(world, [RAIN_OVER_HOME]);
+  const before = events(world.fake, 'rain_approaching').length;
+  await nextFrame(world, []);
+  await nextFrame(world, [RAIN_OVER_HOME]);
+  assert.equal(events(world.fake, 'rain_approaching').length, before);
+});
