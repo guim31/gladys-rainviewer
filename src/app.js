@@ -390,13 +390,16 @@ export function createApp(gladys, options = {}) {
   gladys.onDeviceCreated(async (device) => {
     const place = placeOf(device?.external_id);
     if (place) {
-      gladys.forgetPublishedStates?.(device.external_id);
+      // The SDK forgets the published states of a created device by itself.
       if (running) {
         await running;
       }
-      await refresh({ force: false });
+      // Drawn earlier (the device was deleted, then added again): the cycle
+      // will not draw it again for this frame, so its image is sent here.
+      const drawnBefore = watched.get(placeId(place))?.image !== undefined;
+      await refresh();
       const entry = watched.get(placeId(place));
-      if (entry?.image) {
+      if (drawnBefore && entry?.image) {
         await gladys
           .publishCameraImage(
             device.external_id,

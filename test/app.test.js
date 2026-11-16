@@ -54,7 +54,7 @@ test('an added place gets its states, its radar image and a widget refresh at on
   assert.ok(last(fake, 'rate').state > 1);
   assert.equal(last(fake, 'distance').state, 0);
   assert.match(last(fake, 'radar_time').text, /^\d\d:\d\d$/);
-  assert.ok(fake.cameraImages.length >= 1);
+  assert.equal(fake.cameraImages.length, 1, 'one image per frame, not one more on creation');
   const image = fake.cameraImages.at(-1).image;
   assert.match(image, /^image\/jpg;base64,\/9j\//);
   assert.ok(image.length <= MAX_CAMERA_IMAGE);
@@ -270,4 +270,15 @@ test('a reconnection does not repeat the triggers of the current frame', async (
   await world.app.refresh();
   await settle();
   assert.equal(events(world.fake, 'rain_approaching').length, 1);
+});
+
+test('a place deleted then added again gets its image back at once', async () => {
+  const world = await createWorld();
+  await createAll(world);
+  const [device] = world.fake.discoveredDevices;
+  await world.fake.deviceDeleted(device);
+  await world.fake.deviceCreated(device);
+  await settle();
+  assert.equal(world.fake.cameraImages.length, 2);
+  assert.equal(statesOf(world.fake, 'rain').length, 2, 'states re-sent');
 });
