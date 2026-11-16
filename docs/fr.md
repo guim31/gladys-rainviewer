@@ -51,7 +51,7 @@ Hors de la couverture radar (océans, une grande partie de l’Afrique et de l�
 
 Déclencheurs :
 
-- **RainViewer : pluie en approche** : la pluie du radar arrive à la distance configurée d’un lieu où il ne pleut pas encore. Une fois par approche, jamais au démarrage. Variables : lieu, distance (km).
+- **RainViewer : pluie en approche** : la pluie du radar arrive à la distance configurée d’un lieu où il ne pleut pas encore. Une fois par approche (aussi quand une averse commence sur le lieu entre deux images radar, à 0 km), jamais au démarrage. Variables : lieu, distance (km).
 - **RainViewer : fin de la pluie** : le radar ne montre plus de pluie sur un lieu depuis 20 minutes, après un épisode pluvieux. Variables : lieu, durée de la pluie (min).
 
 Laissez le lieu vide pour tous les lieux. La pluie qui commence, c’est la fonctionnalité **Pluie** qui passe à 1, une condition d’appareil classique.

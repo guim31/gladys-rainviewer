@@ -51,7 +51,7 @@ Außerhalb der Radarabdeckung (Ozeane, große Teile Afrikas und Asiens) zeigt da
 
 Auslöser:
 
-- **RainViewer: Regen im Anmarsch**: Regen auf dem Radar kommt einem Ort, an dem es noch nicht regnet, bis auf die eingestellte Entfernung nahe. Einmal pro Annäherung, nie beim Start. Variablen: Ort, Entfernung (km).
+- **RainViewer: Regen im Anmarsch**: Regen auf dem Radar kommt einem Ort, an dem es noch nicht regnet, bis auf die eingestellte Entfernung nahe. Einmal pro Annäherung (auch wenn ein Schauer zwischen zwei Radarbildern direkt am Ort beginnt, mit 0 km), nie beim Start. Variablen: Ort, Entfernung (km).
 - **RainViewer: Regen vorbei**: Das Radar zeigt nach einem Regenschauer seit 20 Minuten keinen Regen mehr über einem Ort. Variablen: Ort, Regendauer (min).
 
 Lass den Ort leer für alle Orte. Beginnender Regen ist die Funktion **Regen**, die auf 1 geht, eine normale Gerätebedingung.

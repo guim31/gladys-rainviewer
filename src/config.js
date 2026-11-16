@@ -3,6 +3,8 @@
 // normalization, so the rest of the code never deals with a raw form value.
 // -----------------------------------------------------------------------------
 
+import { slugOf } from './devices.js';
+
 export const LANGUAGES = ['en', 'fr', 'de', 'es'];
 export const ZOOMS = ['5', '6', '7'];
 export const APPROACH_MIN_KM = 2;
@@ -46,7 +48,8 @@ export function parsePlaces(text) {
       name === '' ||
       !(Math.abs(latitude) <= 85) ||
       !(Math.abs(longitude) <= 180) ||
-      places.some((place) => place.name.toLowerCase() === name.toLowerCase())
+      // Two names with one identifier ("Café", "Cafe") would be one device.
+      places.some((place) => slugOf(place.name) === slugOf(name))
     ) {
       errors.push(trimmed.slice(0, 60));
       continue;

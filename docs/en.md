@@ -51,7 +51,7 @@ Outside the radar coverage (oceans, most of Africa and Asia), the device shows t
 
 Triggers:
 
-- **RainViewer: rain approaching**: rain comes within the configured distance of a place where it does not rain yet. Fires once per approach, never at start-up. Variables: place, distance (km).
+- **RainViewer: rain approaching**: rain comes within the configured distance of a place where it does not rain yet. Fires once per approach (also when a shower starts on the place between two radar frames, at 0 km), never at start-up. Variables: place, distance (km).
 - **RainViewer: rain stopped**: the radar has shown no more rain over a place for 20 minutes, after a rain episode. Variables: place, rain duration (min).
 
 Leave the place empty for every place. Rain that starts is the **Rain** feature going to 1, a regular device condition.

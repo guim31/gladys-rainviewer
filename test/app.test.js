@@ -282,3 +282,67 @@ test('a place deleted then added again gets its image back at once', async () =>
   assert.equal(world.fake.cameraImages.length, 2);
   assert.equal(statesOf(world.fake, 'rain').length, 2, 'states re-sent');
 });
+
+test('started under the rain, rain moving away close by is no "rain approaching"', async () => {
+  const server = (await createWorld({ connect: false })).server;
+  server.cells = [RAIN_OVER_HOME];
+  const world = await createWorld({ server });
+  await createAll(world);
+  await nextFrame(world, [cellAt(3)]);
+  assert.equal(events(world.fake, 'rain_approaching').length, 0);
+});
+
+test('a shower that starts within one frame is "rain approaching" at 0 km', async () => {
+  const world = await createWorld();
+  await createAll(world);
+  await nextFrame(world, [RAIN_OVER_HOME]);
+  const [event] = events(world.fake, 'rain_approaching');
+  assert.equal(event?.data.distance_km, 0);
+});
+
+test('a state refused by Gladys does not lose the scene event', async () => {
+  const world = await createWorld();
+  await createAll(world);
+  world.gladys.publishChangedStates = async () => {
+    throw new Error('HTTP 429');
+  };
+  await nextFrame(world, [cellAt(30)]);
+  await nextFrame(world, [cellAt(10)]);
+  assert.equal(events(world.fake, 'rain_approaching').length, 1);
+});
+
+test('a new "rain approaching" distance fires nothing by itself', async () => {
+  const world = await createWorld({ config: { approach_km: 5 } });
+  world.server.cells = [cellAt(10)];
+  await createAll(world);
+  await world.fake.configUpdated({ approach_km: 15 });
+  await settle();
+  await nextFrame(world);
+  assert.equal(events(world.fake, 'rain_approaching').length, 0);
+});
+
+test('the coverage mask down: the rain is still read', async () => {
+  const server = (await createWorld({ connect: false })).server;
+  const fetch = server.fetch;
+  server.fetch = async (url, init) => {
+    if (url.includes('/coverage/')) {
+      return new Response('', { status: 502 });
+    }
+    return fetch(url, init);
+  };
+  server.cells = [RAIN_OVER_HOME];
+  const world = await createWorld({ server });
+  await createAll(world);
+  assert.equal(last(world.fake, 'rain').state, 1);
+});
+
+test('RainViewer down for an hour: the scene action fails instead of an old reading', async () => {
+  const world = await createWorld();
+  await createAll(world);
+  const place = world.fake.discoveredDevices[0].external_id;
+  world.server.down = true;
+  world.clock.now += 60 * 60_000;
+  const answer = await world.fake.sceneAction('get_rain', { place });
+  assert.equal(answer.success, false);
+  assert.match(answer.error.en, /RainViewer does not answer/);
+});

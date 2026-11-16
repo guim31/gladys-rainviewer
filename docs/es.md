@@ -51,7 +51,7 @@ Fuera de la cobertura radar (océanos, gran parte de África y Asia), el disposi
 
 Disparadores:
 
-- **RainViewer: lluvia acercándose**: la lluvia del radar llega a la distancia configurada de un lugar donde aún no llueve. Una vez por aproximación, nunca al arrancar. Variables: lugar, distancia (km).
+- **RainViewer: lluvia acercándose**: la lluvia del radar llega a la distancia configurada de un lugar donde aún no llueve. Una vez por aproximación (también cuando un chubasco empieza en el lugar entre dos imágenes de radar, a 0 km), nunca al arrancar. Variables: lugar, distancia (km).
 - **RainViewer: la lluvia ha parado**: el radar no muestra lluvia sobre un lugar desde hace 20 minutos, tras un episodio de lluvia. Variables: lugar, duración de la lluvia (min).
 
 Deje el lugar vacío para todos los lugares. La lluvia que empieza es la función **Lluvia** que pasa a 1, una condición de dispositivo habitual.

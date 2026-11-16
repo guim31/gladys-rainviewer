@@ -24,6 +24,8 @@ export const CYCLE_MS = 5 * 60_000;
 export const HEARTBEAT_MS = 6 * 3600_000;
 // RainViewer unreachable this long: the integration says so in Gladys.
 export const OUTAGE_MS = 30 * 60_000;
+// A reading older than this is not the weather of now (frames lag ~10 min).
+export const STALE_MS = 45 * 60_000;
 // Dry radar frames (10 minutes each) after which the rain has stopped.
 export const DRY_FRAMES_TO_STOP = 2;
 export const TRIGGERS = { APPROACHING: 'rain_approaching', STOPPED: 'rain_stopped' };
@@ -54,6 +56,8 @@ export function createApp(gladys, options = {}) {
   let invalidPlaces = [];
   let frame = null;
   let lastSuccess = null;
+  const startedAt = now();
+  const failingPlaces = new Set();
   let failing = false;
   let reportedDown = false;
   let timer = null;
@@ -129,7 +133,7 @@ export function createApp(gladys, options = {}) {
       } else {
         logger.debug(`RainViewer still unreachable: ${err.message}`);
       }
-      if (!reportedDown && (lastSuccess === null || now() - lastSuccess >= OUTAGE_MS)) {
+      if (!reportedDown && now() - (lastSuccess ?? startedAt) >= OUTAGE_MS) {
         reportedDown = true;
         await gladys.setConnectionStatus(false, CONNECTION_TEXT.unreachable).catch(() => {});
       }
@@ -137,57 +141,70 @@ export function createApp(gladys, options = {}) {
     }
   }
 
-  function fireTriggers(place, entry, reading) {
+  /** Forget the trigger state: the next reading sets it without any event. */
+  function resetTriggers(entry) {
+    entry.near = undefined;
+    entry.rainSince = null;
+    entry.lastRainAt = null;
+    entry.dry = 0;
+  }
+
+  /** The scene events of a new frame, from the previous state of the place. */
+  function fireTriggers(place, entry, reading, current) {
     const events = [];
-    const ids = deviceIds(gladys, place);
-    const base = { place: ids.device, place_name: place.name };
     if (!reading.covered) {
+      // Unknown there: start afresh when the radar sees the place again.
+      resetTriggers(entry);
       return events;
     }
-    if (reading.raining) {
-      entry.rainSince ??= frame.time;
-      entry.lastRainAt = frame.time;
-      entry.dry = 0;
-      entry.near = true;
-    } else {
-      if (entry.rainSince !== undefined && entry.rainSince !== null) {
-        entry.dry += 1;
-        if (entry.dry >= DRY_FRAMES_TO_STOP) {
-          const minutes = Math.round((entry.lastRainAt - entry.rainSince) / 60_000) + 10;
-          events.push([TRIGGERS.STOPPED, { ...base, duration_minutes: minutes }]);
-          entry.rainSince = null;
-        }
-      }
-      const near = reading.distanceKm !== null && reading.distanceKm <= config.approach_km;
-      // Only a change seen between two frames: never on the first reading.
-      if (near && entry.near === false) {
-        events.push([TRIGGERS.APPROACHING, { ...base, distance_km: reading.distanceKm }]);
-      }
+    const near =
+      reading.raining || (reading.distanceKm !== null && reading.distanceKm <= config.approach_km);
+    if (entry.near === undefined) {
+      // First reading (start-up, device added, back in coverage, new
+      // distance): the state only, never a transition.
       entry.near = near;
+      entry.rainSince = reading.raining ? current.time : null;
+      entry.lastRainAt = entry.rainSince;
+      entry.dry = 0;
+      return events;
+    }
+    const base = { place: deviceIds(gladys, place).device, place_name: place.name };
+    if (near && entry.near === false) {
+      // Rain crossing the distance, or a shower that started within one frame.
+      events.push([
+        TRIGGERS.APPROACHING,
+        { ...base, distance_km: reading.raining ? 0 : reading.distanceKm },
+      ]);
+    }
+    entry.near = near;
+    if (reading.raining) {
+      entry.rainSince ??= current.time;
+      entry.lastRainAt = current.time;
+      entry.dry = 0;
+    } else if (entry.rainSince !== null) {
+      entry.dry += 1;
+      if (entry.dry >= DRY_FRAMES_TO_STOP) {
+        const minutes = Math.round((entry.lastRainAt - entry.rainSince) / 60_000) + 10;
+        events.push([TRIGGERS.STOPPED, { ...base, duration_minutes: minutes }]);
+        entry.rainSince = null;
+        entry.lastRainAt = null;
+      }
     }
     return events;
   }
 
-  /** Read, draw and publish one place for the current frame. */
-  async function processPlace(place, { force = false } = {}) {
+  /** Read, draw and publish one place for a frame. */
+  async function processPlace(place, current, { force = false } = {}) {
     const id = placeId(place);
-    const entry = watched.get(id) ?? { near: undefined, dry: 0, rainSince: null };
-    watched.set(id, entry);
+    if (!watched.has(id)) {
+      watched.set(id, { near: undefined, dry: 0, rainSince: null, lastRainAt: null });
+    }
+    const entry = watched.get(id);
     let events = [];
-    if (entry.framePath !== frame.path || force) {
-      const reading = await analyzePlace(sources, frame, place);
-      if (entry.framePath !== frame.path) {
-        if (entry.framePath !== undefined) {
-          events = fireTriggers(place, entry, reading);
-        } else {
-          // First reading: the state only, no transition.
-          entry.near =
-            !reading.raining &&
-            reading.distanceKm !== null &&
-            reading.distanceKm <= config.approach_km;
-          entry.rainSince = reading.raining ? frame.time : null;
-          entry.lastRainAt = reading.raining ? frame.time : null;
-        }
+    if (entry.framePath !== current.path || force) {
+      const reading = await analyzePlace(sources, current, place, { logger });
+      if (entry.framePath !== current.path) {
+        events = fireTriggers(place, entry, reading, current);
       }
       if (entry.covered !== undefined && entry.covered !== reading.covered) {
         logger.info(`${place.name}: ${reading.covered ? 'back in' : 'outside'} the radar coverage`);
@@ -196,19 +213,26 @@ export function createApp(gladys, options = {}) {
       }
       entry.covered = reading.covered;
       entry.reading = reading;
-      entry.framePath = frame.path;
-      entry.frameTime = frame.time;
+      entry.framePath = current.path;
+      entry.frameTime = current.time;
     }
-    if (entry.imageFrame !== frame.path || entry.imageZoom !== config.zoom || force) {
-      entry.image = await renderPlace(sources, frame, place, {
+    // The events first: a refused state must not lose them.
+    for (const [key, data] of events) {
+      logger.debug(`${place.name}: ${key}`);
+      await gladys
+        .publishSceneEvent(key, data)
+        .catch((err) => logger.warn(`Scene event ${key} refused: ${err.message}`));
+    }
+    if (entry.imageFrame !== current.path || entry.imageZoom !== config.zoom || force) {
+      entry.image = await renderPlace(sources, current, place, {
         zoom: Number(config.zoom),
         // 24-hour clock: the bitmap font has no AM/PM.
-        time: timeOf(frame.time, 'fr'),
+        time: timeOf(current.time, 'fr'),
         logger,
       });
-      entry.imageFrame = frame.path;
+      entry.imageFrame = current.path;
       entry.imageZoom = config.zoom;
-      entry.imageTime = frame.time;
+      entry.imageTime = current.time;
       await gladys
         .publishCameraImage(
           deviceIds(gladys, place).device,
@@ -216,32 +240,39 @@ export function createApp(gladys, options = {}) {
         )
         .catch((err) => logger.debug(`Camera image of ${place.name} refused: ${err.message}`));
     }
-    await gladys.publishChangedStates(
-      buildStates(gladys, place, entry.reading, timeOf(entry.frameTime, config.language)),
-      { heartbeat: HEARTBEAT_MS },
-    );
-    for (const [key, data] of events) {
-      logger.info(`${place.name}: ${key}`);
-      await gladys
-        .publishSceneEvent(key, data)
-        .catch((err) => logger.warn(`Scene event ${key} refused: ${err.message}`));
-    }
+    await gladys
+      .publishChangedStates(
+        buildStates(gladys, place, entry.reading, timeOf(entry.frameTime, config.language)),
+        { heartbeat: HEARTBEAT_MS },
+      )
+      // Not remembered by the SDK: sent again at the next cycle.
+      .catch((err) => logger.debug(`States of ${place.name} refused: ${err.message}`));
     return entry;
   }
 
   /** One refresh: frame, then every place added in Gladys. */
   async function cycle({ force = false } = {}) {
     await loadPlaces();
-    await fetchFrame();
+    const current = await fetchFrame();
     const created = createdIds();
     let changed = false;
     for (const place of places.filter((item) => isCreated(item, created))) {
-      const before = watched.get(placeId(place))?.imageFrame;
+      const id = placeId(place);
+      const before = watched.get(id)?.imageFrame;
       try {
-        const entry = await processPlace(place, { force });
+        const entry = await processPlace(place, current, { force });
         changed ||= entry.imageFrame !== before;
+        if (failingPlaces.delete(id)) {
+          logger.info(`${place.name}: radar read again`);
+        }
       } catch (err) {
-        logger.warn(`${place.name}: radar not read (${err.message})`);
+        // One line at the first failure, one at the recovery.
+        if (failingPlaces.has(id)) {
+          logger.debug(`${place.name}: radar still not read (${err.message})`);
+        } else {
+          failingPlaces.add(id);
+          logger.warn(`${place.name}: radar not read (${err.message})`);
+        }
       }
     }
     if (changed || force) {
@@ -261,6 +292,14 @@ export function createApp(gladys, options = {}) {
     return running;
   }
 
+  /** A cycle that starts after the one running (new config, new device). */
+  async function refreshAfter(opts) {
+    if (running) {
+      await running;
+    }
+    return refresh(opts);
+  }
+
   function placeOf(externalId) {
     return places.find((place) => deviceIds(gladys, place).device === externalId) ?? null;
   }
@@ -278,16 +317,23 @@ export function createApp(gladys, options = {}) {
     if (!place) {
       throw new ActionFailure(FAILURE.unknownPlace);
     }
+    const fresh = (item) => item?.reading && now() - item.frameTime < STALE_MS;
     let entry = watched.get(placeId(place));
-    if (!entry?.reading) {
+    if (!fresh(entry)) {
       try {
-        if (!frame) {
-          await fetchFrame();
+        await refreshAfter();
+        entry = watched.get(placeId(place));
+        if (!fresh(entry) && frame && now() - frame.time < STALE_MS) {
+          // Not added in Gladys (no cycle reads it): read it for this answer.
+          entry = await processPlace(place, frame);
         }
-        entry = await processPlace(place);
       } catch {
         throw new ActionFailure(FAILURE.unreachable);
       }
+    }
+    if (!fresh(entry)) {
+      // RainViewer down: an old reading would pass for the weather of now.
+      throw new ActionFailure(FAILURE.unreachable);
     }
     return { place, entry };
   }
@@ -297,12 +343,10 @@ export function createApp(gladys, options = {}) {
     if (places.length === 0) {
       throw new ActionFailure(FAILURE.noPlace);
     }
-    try {
-      await fetchFrame();
-    } catch {
+    await refreshAfter();
+    if (failing || !frame) {
       throw new ActionFailure(FAILURE.unreachable);
     }
-    await refresh();
     const message = {};
     for (const lang of LANGS) {
       const text = CHECK_TEXT[lang];
@@ -379,10 +423,17 @@ export function createApp(gladys, options = {}) {
   });
 
   gladys.onConfigUpdated(async (raw) => {
+    const previous = config;
     config = normalizeConfig(raw);
+    if (config.approach_km !== previous.approach_km) {
+      // A new distance is no rain approaching: re-read the state quietly.
+      for (const entry of watched.values()) {
+        entry.near = undefined;
+      }
+    }
     await loadPlaces();
     await publishDevices();
-    await refresh();
+    await refreshAfter();
   });
 
   // Added in Gladys: read it now and send everything (states sent before the
@@ -391,13 +442,10 @@ export function createApp(gladys, options = {}) {
     const place = placeOf(device?.external_id);
     if (place) {
       // The SDK forgets the published states of a created device by itself.
-      if (running) {
-        await running;
-      }
       // Drawn earlier (the device was deleted, then added again): the cycle
       // will not draw it again for this frame, so its image is sent here.
       const drawnBefore = watched.get(placeId(place))?.image !== undefined;
-      await refresh();
+      await refreshAfter();
       const entry = watched.get(placeId(place));
       if (drawnBefore && entry?.image) {
         await gladys

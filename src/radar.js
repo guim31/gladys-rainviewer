@@ -53,10 +53,11 @@ async function mosaic(loadTile, left, top, width, height, zoom) {
  * @param {object} sources - From createSources.
  * @param {object} frame - From sources.latestFrame().
  * @param {{ latitude: number, longitude: number }} place - The place.
+ * @param {object} [options] - `{ logger }`.
  * @returns {Promise<object>} `{ covered, dbz, raining, rate, distanceKm }`;
  * `distanceKm` is null when no rain falls within WATCH_RADIUS_KM.
  */
-export async function analyzePlace(sources, frame, place) {
+export async function analyzePlace(sources, frame, place, { logger = console } = {}) {
   const zoom = MAX_RADAR_ZOOM;
   const center = worldPixel(place.latitude, place.longitude, zoom);
   const kmPx = kmPerPixel(place.latitude, zoom);
@@ -68,7 +69,11 @@ export async function analyzePlace(sources, frame, place) {
   const size = radius * 2 + 1;
   const [radar, coverage] = await Promise.all([
     mosaic((z, x, y) => sources.radarTile(frame, z, x, y), left, top, size, size, zoom),
-    mosaic((z, x, y) => sources.coverageTile(z, x, y), left, top, size, size, zoom),
+    // Without its mask the place is taken as covered: the rain still reads.
+    mosaic((z, x, y) => sources.coverageTile(z, x, y), left, top, size, size, zoom).catch((err) => {
+      logger.debug(`Coverage mask unavailable: ${err.message}`);
+      return () => null;
+    }),
   ]);
 
   const mask = coverage(cx, cy);

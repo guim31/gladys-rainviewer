@@ -124,7 +124,9 @@ export function createSources({
       const url = `${frame.host}${frame.path}/${TILE_SIZE}/${zoom}/${x}/${y}/${RADAR_STYLE}.png`;
       // Shared by the places that ask for it at the same time; forgotten on failure.
       const pending = png(url).catch((err) => {
-        radarTiles.delete(key);
+        if (radarTiles.get(key) === pending) {
+          radarTiles.delete(key);
+        }
         throw err;
       });
       radarTiles.set(key, pending);
@@ -171,8 +173,22 @@ export function createSources({
     }
   }
 
-  /** One OpenStreetMap tile, from memory, from /data, or downloaded. */
-  async function mapTile(zoom, x, y) {
+  // Downloads in flight, shared by the places that need the same tile.
+  const mapPending = new Map();
+
+  /** One OpenStreetMap tile, from memory, from /data, or downloaded (shared). */
+  function mapTile(zoom, x, y) {
+    const key = `${zoom}-${x}-${y}`;
+    if (!mapPending.has(key)) {
+      mapPending.set(
+        key,
+        loadMapTile(zoom, x, y).finally(() => mapPending.delete(key)),
+      );
+    }
+    return mapPending.get(key);
+  }
+
+  async function loadMapTile(zoom, x, y) {
     const key = `${zoom}-${x}-${y}`;
     const memory = mapTiles.get(key);
     if (memory && now() - memory.at < MAP_TTL_MS) {

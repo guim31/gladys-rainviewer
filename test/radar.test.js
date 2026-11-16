@@ -94,13 +94,13 @@ test('geo: Web Mercator pixels, scale, tiles across the antimeridian', () => {
 
 test('other places: names, decimal commas, bad entries reported', () => {
   const { places, errors } = parsePlaces(
-    'Bureau : 48.8566, 2.3522 ; Chalet: 45,92 6,87\nBad: 95, 2; : 1, 2; Nowhere; bureau: 1, 1',
+    'Bureau : 48.8566, 2.3522 ; Chalet: 45,92 6,87\nBad: 95, 2; : 1, 2; Nowhere; bureau: 1, 1; Châlet: 1, 1',
   );
   assert.deepEqual(places, [
     { name: 'Bureau', latitude: 48.8566, longitude: 2.3522 },
     { name: 'Chalet', latitude: 45.92, longitude: 6.87 },
   ]);
-  assert.deepEqual(errors, ['Bad: 95, 2', ': 1, 2', 'Nowhere', 'bureau: 1, 1']);
+  assert.deepEqual(errors, ['Bad: 95, 2', ': 1, 2', 'Nowhere', 'bureau: 1, 1', 'Châlet: 1, 1']);
 });
 
 test('config: defaults and bounds', () => {
