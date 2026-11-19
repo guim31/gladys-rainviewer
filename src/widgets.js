@@ -1,169 +1,134 @@
 // -----------------------------------------------------------------------------
-// Dashboard widgets (SDK v0.14+, Gladys 5.1+).
+// Dashboard widget (manifest `widgets`, Gladys 5.1+): `rain_radar`.
 //
-// A widget puts the integration's own data on the Gladys dashboard without a
-// dedicated core widget. The manifest `widgets` field declares its identity
-// (key, label, icon, optional per-instance `settings`); at runtime the
-// integration returns a DECLARATIVE content — `text`, `value`, `gauge`,
-// `status`, `chart`, `card-list`, `image`, `button` — that the core renders
-// with its own theme, dark mode and translations. No HTML, no CSS.
-//
-// Each entry of WIDGETS is keyed by the widget `key` and exposes:
-//   - get(gladys, { settings, language, units, config }): the content,
-//     registered by index.js with `gladys.onWidgetGet(key, ...)`;
-//   - action(gladys, { actionKey, params, settings, config }) (optional): a
-//     tapped `button` carrying an `action`, registered with
-//     `gladys.onWidgetAction`.
-//
-// Check your contents in the tests with `validateWidgetContent` (exported by
-// the SDK, see test/widgets.test.js), or run with DEBUG=gladys-integration-sdk
-// to have the SDK log every violation of the vocabulary and the budget.
+// One place at a glance: the radar picture, whether it rains there and how
+// much, how far the nearest rain is, and the time of the radar frame with the
+// RainViewer credit. The picture can be hidden (a setting), for a small tile.
 // -----------------------------------------------------------------------------
 
-import {
-  createLogger,
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_TRANSPORTS,
-  WIDGET_COLORS,
-} from '@gladysassistant/integration-sdk';
-import { identifyDevice } from './devices/index.js';
-import { weatherStation } from './devices/weatherStation.js';
-import { plug } from './devices/plug.js';
-import { light } from './devices/light.js';
+import { createHash } from 'node:crypto';
+import { WIDGET_COLORS } from '@gladysassistant/integration-sdk';
+import { placeId } from './devices.js';
+import { WATCH_RADIUS_KM } from './radar.js';
+import { t, timeOf } from './texts.js';
 
-const logger = createLogger({ name: 'widgets' });
+export const WIDGET_KEY = 'rain_radar';
 
-// Widget key, as declared in the manifest `widgets` field.
-export const DEMO_STATUS_WIDGET = 'demo_status';
-
-// Keys of the `button` actions the demo_status content declares.
-const DEMO_STATUS_ACTIONS = { IDENTIFY_LIGHT: 'identify_light' };
-
-// How the plug transport reads in the status list.
-const TRANSPORT_STATUS = {
-  [DEVICE_TRANSPORTS.LOCAL]: { value: { en: 'Local', fr: 'Locale' }, color: WIDGET_COLORS.SUCCESS },
-  [DEVICE_TRANSPORTS.CLOUD]: { value: { en: 'Cloud', fr: 'Cloud' }, color: WIDGET_COLORS.INFO },
-  [DEVICE_TRANSPORTS.UNREACHABLE]: {
-    value: { en: 'Unreachable', fr: 'Injoignable' },
-    color: WIDGET_COLORS.DANGER,
+export const TEXT = {
+  pick: {
+    en: 'Choose a place in the settings of this widget.',
+    fr: 'Choisissez un lieu dans les réglages de ce widget.',
+    de: 'Wähle in den Einstellungen dieses Widgets einen Ort aus.',
+    es: 'Elija un lugar en la configuración de este widget.',
+  },
+  unavailable: {
+    en: 'No radar image for this place yet: RainViewer does not answer, or the place is no longer watched.',
+    fr: 'Pas encore d’image radar pour ce lieu : RainViewer ne répond pas, ou le lieu n’est plus surveillé.',
+    de: 'Noch kein Radarbild für diesen Ort: RainViewer antwortet nicht, oder der Ort wird nicht mehr beobachtet.',
+    es: 'Aún no hay imagen de radar para este lugar: RainViewer no responde, o el lugar ya no se vigila.',
+  },
+  radar: { en: 'Radar', fr: 'Radar', de: 'Radar', es: 'Radar' },
+  rain: { en: 'Rain', fr: 'Pluie', de: 'Regen', es: 'Lluvia' },
+  nearest: {
+    en: 'Nearest rain',
+    fr: 'Pluie la plus proche',
+    de: 'Nächster Regen',
+    es: 'Lluvia más cercana',
+  },
+  coverage: { en: 'Radar', fr: 'Radar', de: 'Radar', es: 'Radar' },
+  outside: {
+    en: 'Outside coverage',
+    fr: 'Hors couverture',
+    de: 'Keine Abdeckung',
+    es: 'Sin cobertura',
+  },
+  no: { en: 'No', fr: 'Non', de: 'Nein', es: 'No' },
+  none: {
+    en: `None within ${WATCH_RADIUS_KM} km`,
+    fr: `Aucune à ${WATCH_RADIUS_KM} km`,
+    de: `Keiner im Umkreis ${WATCH_RADIUS_KM} km`,
+    es: `Ninguna a ${WATCH_RADIUS_KM} km`,
   },
 };
 
-// A live tile references a feature by its external_id: read it from the
-// discovery payload itself, so the widget and the device never disagree.
-function featureExternalId(gladys, config, blueprint, category) {
-  const device = blueprint.buildDevice(gladys, config);
-  return device.features.find((feature) => feature.category === category).external_id;
+const tagOf = (place) => createHash('sha1').update(placeId(place)).digest('hex').slice(0, 12);
+
+// When the bytes change, the key changes: the frame time is part of it.
+export const imageKey = (place, entry) => `radar-${tagOf(place)}-${entry.imageTime.toString(36)}`;
+
+const message = (text, language) => ({
+  ttl_seconds: 60,
+  components: [{ type: 'text', variant: 'body', text: t(text, language) }],
+});
+
+async function get(app, { settings, language = 'en' }) {
+  if (!settings?.place) {
+    return message(TEXT.pick, language);
+  }
+  let found;
+  try {
+    found = await app.readingOf(settings.place);
+  } catch {
+    return message(TEXT.unavailable, language);
+  }
+  const { place, entry } = found;
+  const { reading } = entry;
+  const components = [
+    {
+      type: 'text',
+      variant: 'caption',
+      text: `${t(TEXT.radar, language)} ${timeOf(entry.frameTime, language)} · RainViewer`,
+    },
+  ];
+  if (settings.show_image !== false && entry.image) {
+    components.push({
+      type: 'image',
+      key: imageKey(place, entry),
+      alt: app.deviceName(place).slice(0, 100),
+      fit: 'contain',
+    });
+  }
+  const items = [];
+  if (!reading.covered) {
+    items.push({
+      label: t(TEXT.coverage, language),
+      icon: 'cloud-off',
+      value: t(TEXT.outside, language),
+      color: WIDGET_COLORS.WARNING,
+    });
+  } else {
+    items.push({
+      label: t(TEXT.rain, language),
+      icon: 'cloud-rain',
+      value: reading.raining ? `${reading.rate} mm/h` : t(TEXT.no, language),
+      color: reading.raining ? WIDGET_COLORS.INFO : WIDGET_COLORS.NEUTRAL,
+    });
+    items.push({
+      label: t(TEXT.nearest, language),
+      icon: 'navigation',
+      value: reading.distanceKm === null ? t(TEXT.none, language) : `${reading.distanceKm} km`,
+      color:
+        reading.distanceKm !== null && reading.distanceKm <= app.config.approach_km
+          ? WIDGET_COLORS.WARNING
+          : WIDGET_COLORS.NEUTRAL,
+    });
+  }
+  components.push({ type: 'status', items });
+  return { ttl_seconds: 300, components };
 }
 
-function plugConnectionStatus(gladys, config) {
-  const { transport, degraded } = plug.transport(gladys, config);
-  const { value, color } = TRANSPORT_STATUS[transport];
-  if (degraded) {
-    return {
-      value: { en: `${value.en} (degraded mode)`, fr: `${value.fr} (mode dégradé)` },
-      color: WIDGET_COLORS.WARNING,
-    };
+/** The bytes behind an image key (raw base64 JPEG). */
+export async function widgetImage(app, key) {
+  const match = /^radar-([0-9a-f]{12})-[0-9a-z]+$/.exec(String(key));
+  const place = match ? app.places.find((item) => tagOf(item) === match[1]) : null;
+  const entry = place ? app.watched.get(placeId(place)) : null;
+  if (!entry?.image) {
+    throw new Error(`Unknown image ${key}`);
   }
-  return { value, color };
+  // 150 KB at most (the camera limit), under the 300 KB of a widget image.
+  return entry.image.toString('base64');
 }
 
 export const WIDGETS = {
-  [DEMO_STATUS_WIDGET]: {
-    // `settings` holds the per-instance values of the declared `settings`
-    // (none here); `language` and `units` are those of the user viewing the
-    // dashboard, for the values you format yourself. Multi-language objects
-    // (`{ en, fr }`) are picked by the core, like everywhere else.
-    async get(gladys, { config }) {
-      logger.debug(`onWidgetGet <- ${DEMO_STATUS_WIDGET}`);
-      return {
-        // Reload policy: the computed parts below only change with the
-        // config, and index.js nudges the widget on every (re)connection and
-        // config update (see refreshWidgets) — the TTL is just a safety net.
-        ttl_seconds: 300,
-        components: [
-          // Device-bound tiles: LIVE, they follow the published states over
-          // the core's real-time path. No TTL, no nudge involved.
-          {
-            type: 'value',
-            label: { en: 'Temperature', fr: 'Température' },
-            icon: 'thermometer',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              weatherStation,
-              DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR,
-            ),
-          },
-          {
-            type: 'value',
-            label: { en: 'Office plug', fr: 'Prise du bureau' },
-            icon: 'zap',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              plug,
-              DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-            ),
-          },
-          // Computed rows: what the integration knows that no device feature
-          // carries. Served from the core cache until the TTL or a nudge.
-          {
-            type: 'status',
-            items: [
-              {
-                label: { en: 'Plug connection', fr: 'Connexion de la prise' },
-                icon: 'wifi',
-                ...plugConnectionStatus(gladys, config),
-              },
-              {
-                label: { en: 'Observed location', fr: 'Position observée' },
-                icon: 'map-pin',
-                value: `${config.latitude.toFixed(2)}, ${config.longitude.toFixed(2)}`,
-                color: WIDGET_COLORS.NEUTRAL,
-              },
-            ],
-          },
-          // `params` are declared HERE and sent back as-is: the handler never
-          // receives user input (a dashboard can hang on a public wall).
-          {
-            type: 'button',
-            label: { en: 'Identify the light', fr: 'Identifier la lampe' },
-            icon: 'eye',
-            style: 'secondary',
-            action: {
-              key: DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT,
-              params: { device: light.deviceExternalId(gladys) },
-            },
-          },
-        ],
-      };
-    },
-
-    // Resolve an optional toast (string or multi-language object, ≤ 200
-    // characters). After a successful action the core drops the cached
-    // content and every open dashboard refetches it: no nudge needed.
-    async action(gladys, { actionKey, params, config }) {
-      logger.info(`onWidgetAction <- ${DEMO_STATUS_WIDGET}.${actionKey}`);
-      if (actionKey === DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT) {
-        return identifyDevice(gladys, params.device, config);
-      }
-      // Throwing acks the action as failed: the message reaches the user.
-      throw new Error(`Unknown widget action: ${actionKey}`);
-    },
-  },
+  [WIDGET_KEY]: { get },
 };
-
-/**
- * Freshness nudge: ask the core to re-pull every widget NOW instead of
- * waiting for the content TTL. Call it when you KNOW a computed content
- * changed (here: the config, which drives the plug transport and the observed
- * location) — and after every (re)connection, since the nudges are
- * fire-and-forget: rate-limited core-side to 1 per 10 s per widget, dropped
- * silently while disconnected.
- */
-export function refreshWidgets(gladys) {
-  for (const key of Object.keys(WIDGETS)) {
-    gladys.requestWidgetRefresh(key);
-  }
-}

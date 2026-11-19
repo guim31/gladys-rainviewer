@@ -36,4 +36,6 @@ VOLUME ["/data"]
 USER node
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "index.js"]
+# The JPEG encoder allocates a lot of short-lived memory: a small young
+# generation and a capped heap keep the container well under its 256 MB.
+CMD ["node", "--max-semi-space-size=2", "--max-old-space-size=96", "index.js"]

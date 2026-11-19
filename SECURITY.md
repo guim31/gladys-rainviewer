@@ -30,6 +30,14 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+The integration has no secret: RainViewer and OpenStreetMap need no account.
+It reads the coordinates of the houses of Gladys (`location` permission) and
+sends the tile numbers around them (zoom 7 at most, about 300 km wide) to
+`tilecache.rainviewer.com` and `tile.openstreetmap.org`, never the
+coordinates themselves. It stores only cached map tiles, in `/data/basemap`.
+It opens no port and talks to nothing on the local network.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and the third-party services the integration talks to (RainViewer,
+OpenStreetMap).
