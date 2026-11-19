@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-19
+
 ### Added
 
 - One device per place (the houses of Gladys with a location, and other
@@ -23,3 +25,6 @@ the notes of the version's GitHub Release.
   the scene action "Read the rain".
 - A "Rain radar" dashboard widget, and a "Check the radar" button.
 - Texts and documentation in English, French, German and Spanish.
+
+[Unreleased]: https://github.com/guim31/gladys-rainviewer/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-rainviewer/releases/tag/v1.0.0
